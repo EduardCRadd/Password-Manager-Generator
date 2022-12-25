@@ -2,9 +2,24 @@ import tkinter as tk
 from tkinter import messagebox
 import random
 import pyperclip
-import json
+import sqlite3
 
-# ---------------------------- PASSWORD GENERATOR ------------------------------- #
+
+# DATABASE.
+db = sqlite3.connect('user-data.db')
+cursor = db.cursor()
+id = None
+
+# cursor.execute('CREATE TABLE UserData (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, '
+#                'website varchar(250) NOT NULL UNIQUE, '
+#                'email varchar(250) NOT NULL, '
+#                'password varchar(250) NOT NULL)')
+
+# cursor.execute('INSERT INTO UserData VALUES(1, "amazon.co.uk", "my_email@gmail.com", "wieuiwrhfg4")')
+# db.commit()
+
+
+# PASSWORD GENERATOR.
 def generate_password():
     letters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u',
                'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
@@ -23,61 +38,47 @@ def generate_password():
     password_entry.insert(0, string=password)
     pyperclip.copy(password)
 
-# ---------------------------- SAVE PASSWORD ------------------------------- #
 
+# SAVE PASSWORD.
 def save():
-
     website = website_entry.get()  # .get() fetches the current entry text.
-    email = email_entry.get()  # everything in those entries gets aggregated to new_data.
     password = password_entry.get()
-    new_data = {
-        website: {
-            "email": email,
-            "password": password,
-        }
-    }
 
     if len(website) == 0 or len(password) == 0:
         messagebox.showinfo(title="Oops", message="Please make sure you haven't left any fields empty.")
     else:
         try:
-            with open("data.json", "r") as data_file:  # how to write data to a json file.
-                # Read old data.
-                data = json.load(data_file)  # takes in only the file path. takes in json data and converts it into a python dictionary.
-                # print(data)  # if print(type(data)) will outcome <class 'dict'>
-        except FileNotFoundError:
-            with open("data.json", "w") as data_file:
-                json.dump(new_data, data_file, indent=4)
-        else:
-            # Updating old data with new data.
-            data.update(new_data)
+            cursor.execute("INSERT INTO UserData VALUES(?, ?, ?, ?)",
+                           (None, website_entry.get(), email_entry.get(), password_entry.get()))
+            db.commit()
 
-            with open("data.json", "w") as data_file:
-                # Saving updated data
-                json.dump(data, data_file, indent=4)  # the thing that you want to dump and the file where to do that.
         finally:
             website_entry.delete(0, tk.END)  # .delete() from index 0, first char till the END.
             password_entry.delete(0, tk.END)
 
-# ---------------------------- FIND PASSWORD ------------------------------- #
 
+#  FIND PASSWORD.
 def find_password():
     website = website_entry.get()
+
     try:
-        with open("data.json") as data_file:
-            data = json.load(data_file)
+        cursor.execute("SELECT * FROM UserData WHERE website=?", (website,))
+        result = cursor.fetchall()
+        print(result)
+
     except FileNotFoundError:
         messagebox.showinfo(title="Error", message="No Data File Found.")
+
     else:
-        if website in data:
-            email = data[website]["email"]
-            password = data[website]["password"]
+        if website in result[0]:
+            email = result[0][1]
+            password = result[0][3]
             messagebox.showinfo(title=website, message=f"Email: {email}\nPassword: {password}")
         else:
             messagebox.showinfo(title="Error", message=f"No details for {website} exists.")
 
-# ---------------------------- UI SETUP ------------------------------- #
 
+# UI INTERFACE.
 window = tk.Tk()
 window.title("Password Manager")
 window.config(padx=50, pady=50)
@@ -97,7 +98,7 @@ password_label.grid(column=0, row=3)
 
 # Entries
 website_entry = tk.Entry(width=21)
-website_entry.grid(column=1, row=1)  
+website_entry.grid(column=1, row=1)
 website_entry.focus()
 email_entry = tk.Entry(width=39)
 email_entry.grid(column=1, row=2, columnspan=2)
